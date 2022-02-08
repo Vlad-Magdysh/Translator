@@ -54,6 +54,7 @@ int main() {
 		text_len = my_socket.send_to(user_input.c_str(), user_input.size(), 0);
 		cout << "Sent " << text_len << " bytes\n";
 
+		//Cyrillic are encoded using 2 bytes 
 		text_len = my_socket.recive(recvbuf.data(), MESSAGE_SIZE, 0);
 
 		if (text_len > 0) {
