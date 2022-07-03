@@ -26,7 +26,11 @@ int main() {
 	setvbuf(stdout, nullptr, _IOFBF, 1000);
 
 	WSADATA WSAData;
-	WSAStartup(MAKEWORD(2, 0), &WSAData);
+	const int wsa_startup_status_code = WSAStartup(MAKEWORD(2, 0), &WSAData);
+	
+	if (wsa_startup_status_code != 0) {
+		std::cerr << "WSAStartup finished with not zero status code: " << wsa_startup_status_code << std::endl;
+	}
 
 	const char* IP = "127.0.0.1";
 	const int PORT = 5555;
@@ -44,6 +48,7 @@ int main() {
 	}
 	catch (std::exception& ex) {
 		std::cerr << "Unexpected exception" << ex.what() << std::endl;
+		return -1;
 	}
 	const int MESSAGE_SIZE = 100;
 	Message recvbuf(MESSAGE_SIZE+1);
@@ -56,7 +61,7 @@ int main() {
 			continue;
 		try
 		{
-			text_len = my_socket.send_to(user_input.c_str(), user_input.size(), 0);
+			text_len = my_socket.send_message(user_input.c_str(), user_input.size(), 0);
 			std::cout << "Sent " << text_len << " bytes\n";
 		}
 		catch (const std::exception& ex)
@@ -68,7 +73,7 @@ int main() {
 
 		try
 		{
-			text_len = my_socket.recive(recvbuf.data(), MESSAGE_SIZE, 0);
+			text_len = my_socket.receive_message(recvbuf.data(), MESSAGE_SIZE, 0);
 		}
 		catch (const std::exception& ex)
 		{
