@@ -1,3 +1,5 @@
+"""Main file of the server"""
+
 import logging
 import sys
 
@@ -8,11 +10,13 @@ logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+MESSAGE_SIZE = 1024
+IP = '127.0.0.1'
+PORT = 5555
 
 if __name__ == "__main__":
-    MESSAGE_SIZE = 1024
     translator = MyTranslator()
-    with SocketManager() as client_sock:
+    with SocketManager(ip=IP, port=PORT) as client_sock:
         while True:
             data = None
             try:
@@ -24,9 +28,12 @@ if __name__ == "__main__":
 
             word_in_english = data.partition(b'\n')[0]
             word_in_english = word_in_english.decode("utf-8")
-            logger.info("Запрос от клиента (decoded): type = {} value = {}".format(type(word_in_english), word_in_english))
-
-            answer = translator.translate(word_in_english, dest='ru')
+            logger.info(f"Client request (decoded): type = {type(word_in_english)} value = {word_in_english}")
+            try:
+                answer = translator.translate(word_in_english, dest='uk')
+            except Exception as ex:
+                logger.error(str(ex))
+                continue
 
             client_sock.sendall(answer.encode("utf-8"))
-            logger.info("Ответ клиенту: type = {} value = {}".format(type(answer), answer))
+            logger.info(f"Response: type = {type(answer)} value = {answer}")
