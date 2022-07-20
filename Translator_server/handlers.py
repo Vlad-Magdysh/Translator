@@ -12,7 +12,7 @@ translator = MyTranslator()
 MESSAGE_SIZE = 1024
 
 
-def client_processing(client_address, client_socket):
+def client_processing(client_socket: socket, client_address: socket):
     while True:
         data = None
         try:
@@ -41,17 +41,17 @@ def threading_handler(client_socket: socket, client_address: socket):
     Takes a new client socket, creates a thread to handle user` requests
     :return:
     """
-    thread = threading.Thread(target=client_processing, args=(client_address, client_socket))
+    thread = threading.Thread(target=client_processing, args=(client_socket, client_address))
     thread.start()
     return thread
 
 
-def multiprocessing_handler(client_address: socket, client_socket: socket):
+def multiprocessing_handler(client_socket: socket, client_address: socket):
     """
     Takes a new client socket, creates a new process to handle users` requests
     :return:
     """
-    process = multiprocessing.Process(target=client_processing, args=(client_address, client_socket))
+    process = multiprocessing.Process(target=client_processing, args=(client_socket, client_address))
     # When a main process exits, it attempts to terminate all of its daemonic child processes.
     process.daemon = True
     process.start()

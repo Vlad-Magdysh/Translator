@@ -53,5 +53,5 @@ if __name__ == "__main__":
 
     with SocketManager(ip=IP, port=PORT, listen=arguments.listen) as client_socket_generator:
         for client_socket, client_address in client_socket_generator:
-            test_1 = client_socket_handler()
+            test_1 = client_socket_handler(client_socket, client_address)
 
