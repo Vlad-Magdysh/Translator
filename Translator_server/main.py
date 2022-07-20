@@ -1,39 +1,57 @@
 """Main file of the server"""
-
+import argparse
 import logging
+import multiprocessing
 import sys
 
-from my_translator import MyTranslator
 from socket_manager import SocketManager
+from handlers import threading_handler, multiprocessing_handler, default_single_client_handler
 
 logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-MESSAGE_SIZE = 1024
 IP = '127.0.0.1'
 PORT = 5555
 
+MULTIPROCESSING = "multiprocessing"
+THREADING = "threading"
+
+def get_args():
+    if __name__ == "__main__":
+
+        parser = argparse.ArgumentParser(description="Translator server")
+
+        parser.add_argument("-l", "--listen", type=int,
+                            choices=list(range(1, 10)), default=4, help="Max number of connections")
+
+        modes = parser.add_mutually_exclusive_group()
+        modes.add_argument("-t", "--threading",
+                           action='store_const',
+                           const=THREADING,
+                           dest='mode',
+                           help="Start server in Threading mode")
+        modes.add_argument("-p", "--multiprocessing",
+                           action='store_const',
+                           const=MULTIPROCESSING,
+                           dest='mode',
+                           help="Start server in Threading mode")
+
+        parsed = parser.parse_args()
+        return parsed
+
 if __name__ == "__main__":
-    translator = MyTranslator()
-    with SocketManager(ip=IP, port=PORT) as client_sock:
-        while True:
-            data = None
-            try:
-                data = client_sock.recv(MESSAGE_SIZE)
-            except ConnectionResetError:
-                logger.warning("Client dropped the existing connection")
-            if not data:
-                break
+    mode_to_handler = {
+        THREADING: threading_handler,
+        MULTIPROCESSING: multiprocessing_handler,
+        None: default_single_client_handler
+    }
+    arguments = get_args()
+    client_socket_handler = mode_to_handler.get(arguments.mode, default_single_client_handler)
 
-            word_in_english = data.partition(b'\n')[0]
-            word_in_english = word_in_english.decode("utf-8")
-            logger.info(f"Client request (decoded): type = {type(word_in_english)} value = {word_in_english}")
-            try:
-                answer = translator.translate(word_in_english, dest='uk')
-            except Exception as ex:
-                logger.error(str(ex))
-                continue
+    logger.info(f"Server mode selected: {client_socket_handler.__name__ }")
 
-            client_sock.sendall(answer.encode("utf-8"))
-            logger.info(f"Response: type = {type(answer)} value = {answer}")
+    with SocketManager(ip=IP, port=PORT, listen=arguments.listen) as client_socket_generator:
+        for client_socket, client_address in client_socket_generator:
+            test_1 = client_socket_handler()
+
