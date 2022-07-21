@@ -25,7 +25,7 @@ if __name__ == "__main__":
                 logger.warning("Client dropped the existing connection")
             if not data:
                 break
-
+#""Ss's's''s's
             word_in_english = data.partition(b'\n')[0]
             word_in_english = word_in_english.decode("utf-8")
             logger.info(f"Client request (decoded): type = {type(word_in_english)} value = {word_in_english}")
