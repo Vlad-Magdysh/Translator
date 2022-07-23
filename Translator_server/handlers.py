@@ -3,6 +3,8 @@ import threading
 import multiprocessing
 
 import logging
+from contextlib import closing
+
 from my_translator import MyTranslator
 
 logger = logging.getLogger(__name__)
@@ -13,27 +15,27 @@ MESSAGE_SIZE = 1024
 
 
 def client_processing(client_socket: socket, client_address: socket):
-    while True:
-        data = None
-        try:
-            data = client_socket.recv(MESSAGE_SIZE)
-        except ConnectionResetError:
-            logger.warning("Client dropped the existing connection")
-        if not data:
-            break
+    with closing(client_socket):
+        while True:
+            data = None
+            try:
+                data = client_socket.recv(MESSAGE_SIZE)
+            except ConnectionResetError:
+                logger.warning("Client dropped the existing connection")
+            if not data:
+                break
 
-        word_in_english = data.partition(b'\n')[0]
-        word_in_english = word_in_english.decode("utf-8")
-        logger.info(f"Client {client_address} request: value = {word_in_english}")
-        try:
-            answer = translator.translate(word_in_english, dest='uk')
-        except Exception as ex:
-            logger.error(str(ex))
-            continue
+            word_in_english = data.partition(b'\n')[0]
+            word_in_english = word_in_english.decode("utf-8")
+            logger.info(f"Client {client_address} request: value = {word_in_english}")
+            try:
+                answer = translator.translate(word_in_english, dest='uk')
+            except Exception as ex:
+                logger.error(str(ex))
+                continue
 
-        client_socket.sendall(answer.encode("utf-8"))
-        logger.info(f"Response {client_address}:  value = {answer}")
-    client_socket.close()
+            client_socket.sendall(answer.encode("utf-8"))
+            logger.info(f"Response {client_address}:  value = {answer}")
 
 
 def threading_handler(client_socket: socket, client_address: socket):
