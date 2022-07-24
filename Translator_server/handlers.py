@@ -44,6 +44,7 @@ def threading_handler(client_socket: socket, client_address: socket):
     :return:
     """
     thread = threading.Thread(target=client_processing, args=(client_socket, client_address))
+    thread.daemon = True
     thread.start()
     return thread
 

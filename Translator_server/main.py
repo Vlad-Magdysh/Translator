@@ -1,7 +1,6 @@
 """Main file of the server"""
 import argparse
 import logging
-import multiprocessing
 import sys
 
 from socket_manager import SocketManager
@@ -16,6 +15,7 @@ PORT = 5555
 
 MULTIPROCESSING = "multiprocessing"
 THREADING = "threading"
+
 
 def get_args():
     parser = argparse.ArgumentParser(description="Translator server")
@@ -38,6 +38,7 @@ def get_args():
     parsed = parser.parse_args()
     return parsed
 
+
 if __name__ == "__main__":
     mode_to_handler = {
         THREADING: threading_handler,
@@ -47,9 +48,9 @@ if __name__ == "__main__":
     arguments = get_args()
     client_socket_handler = mode_to_handler.get(arguments.mode, default_single_client_handler)
 
-    logger.info(f"Server mode selected: {client_socket_handler.__name__ }")
+    logger.info(f"Server mode selected: {client_socket_handler.__name__}")
 
-    with SocketManager(ip=IP, port=PORT, listen=arguments.listen) as client_socket_generator:
-
-        for client_socket, client_address in client_socket_generator:
-            test_1 = client_socket_handler(client_socket, client_address)
+    with SocketManager(ip=IP, port=PORT, listen=arguments.listen) as connections_handler:
+        while True:
+            client_socket, client_address = connections_handler.wait_connection()
+            client_socket_handler(client_socket, client_address)
