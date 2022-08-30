@@ -3,6 +3,7 @@
 import functools
 import logging
 import time
+from abc import abstractmethod, ABC
 
 from googletrans import Translator
 
@@ -40,7 +41,13 @@ def retry(number=5, timeout=0.1):
     return internal
 
 
-class MyTranslator:
+class BaseTranslator(ABC):
+    @abstractmethod
+    def translate(self, word, dest='uk', src='auto') -> str:
+        pass
+
+
+class MyTranslator(BaseTranslator):
     """
     Wrapper on the googletrans.Translator
     """
@@ -49,7 +56,7 @@ class MyTranslator:
         self._translator.raise_Exception = True
 
     @retry(number=10, timeout=0.5)
-    def translate(self, word, dest='uk', src='auto'):
+    def translate(self, word, dest='uk', src='auto') -> str:
         """
         Translate a word from a language to another
         :param word: Word to translate
