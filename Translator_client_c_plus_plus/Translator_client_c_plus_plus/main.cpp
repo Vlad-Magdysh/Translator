@@ -18,30 +18,35 @@ std::ostream& operator<< (std::ostream& out, const Message& v) {
 	auto iter = v.begin();
 	while (iter != v.end() && *iter !=0)
 	{
-		std::cout << *iter++;
+		out << *iter++;
 	}
-	std::cout << std::endl;
 	return out;
 }
 
 class OutputStrategy
 {
 public:
-	virtual void display_answer(const Message& answer) = 0;
+	virtual void display_answer(const Message& answer, const size_t answer_size) = 0;
 };
 
 class OutputInFile : public OutputStrategy
 {
+private:
+	std::string file_destination;
+
 public:
-	virtual void display_answer(const Message& answer) final {
-		std::ofstream fs("test_outpu.txt");
+	OutputInFile(const std::string& dest) {
+		file_destination = dest;
+	}
+	virtual void display_answer(const Message& answer, const size_t answer_size) final {
+		std::ofstream fs(file_destination, std::ios::app);
 		if (!fs)
 		{
 			std::cerr << "Cannot open the output file." << std::endl;
 		}
 		else
 		{
-			fs << answer;
+			fs << answer << "\n";
 		}
 	}
 };
@@ -49,7 +54,7 @@ public:
 class OutputInStdout : public OutputStrategy
 {
 public:
-	virtual void display_answer(const Message& answer) final {
+	virtual void display_answer(const Message& answer, const size_t answer_size) final {
 		std::cout << "RESULT: " << answer;
 	}
 };
@@ -57,9 +62,9 @@ public:
 class OutputInMessageBox : public OutputStrategy
 {
 public:
-	virtual void display_answer(const Message& answer) final {
+	virtual void display_answer(const Message& answer, const size_t answer_size ) final {
 		std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
-		std::wstring wstr = converter.from_bytes(answer.data(), answer.data() + answer.size());
+		std::wstring wstr = converter.from_bytes(answer.data(), answer.data() + answer_size);
 		MessageBoxW(HWND_DESKTOP, wstr.c_str(), L"", MB_OK | MB_ICONQUESTION);
 	}
 };
@@ -80,15 +85,24 @@ int main(int argc, char* argv[]) {
 
 	OutputStrategy* output_object = NULL;
 
-	auto a = argv[1];
-	std::cout << a << (a == "-message_box") << strcmp(a, "-message_box")  << std::endl;
 
-	if (argc != 1) {
-		if (argv[1] == "-message_box") {
+	if (argc > 1) {
+		std::string user_choise = argv[1];
+		if (user_choise == "-message_box") {
 			output_object = new OutputInMessageBox();
 		}
-		else if (argv[1] == "-file") {
-			output_object = new OutputInFile();
+		else if (user_choise == "-file") {
+			std::string file_path;
+			if (argc > 2)
+			{
+				file_path = argv[2];
+			}
+			else {
+				file_path = argv[0];
+				file_path.erase(file_path.find_last_of('\\') + 1);
+				file_path += "default_file.txt";
+			}
+			output_object = new OutputInFile(file_path);
 		}
 		else
 		{
@@ -100,6 +114,7 @@ int main(int argc, char* argv[]) {
 		output_object = new OutputInStdout();
 	}
 
+	std::cout << "Client is running with configured" << typeid(output_object).name() << std::endl;
 
 	MySocket my_socket;
 
@@ -141,7 +156,6 @@ int main(int argc, char* argv[]) {
 		try
 		{
 			text_len = my_socket.receive_message(recvbuf.data(), MESSAGE_SIZE, 0);
-			output_object->display_answer(recvbuf);
 		}
 		catch (const std::exception& ex)
 		{
@@ -158,8 +172,7 @@ int main(int argc, char* argv[]) {
 		else {
 			std::cerr << "Failed to receive\n";
 		}
-
-		std::cout << "RESULT: " << recvbuf;
+		output_object->display_answer(recvbuf, text_len);
 	}
 	WSACleanup();
 }
