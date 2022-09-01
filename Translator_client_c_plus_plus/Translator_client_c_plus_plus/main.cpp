@@ -1,9 +1,13 @@
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS
 #include <iostream> 
 #include <cstdio> 
 #include <winsock2.h> 
-#include <vector>
 
+#include <fstream>
+#include <codecvt>
+#include <locale>
+#include <string>
 #pragma comment(lib, "WS2_32.lib")
 
 #include "MySocket.h"
@@ -20,11 +24,50 @@ std::ostream& operator<< (std::ostream& out, const Message& v) {
 	return out;
 }
 
-int main() {
+class OutputStrategy
+{
+public:
+	virtual void display_answer(const Message& answer) = 0;
+};
+
+class OutputInFile : public OutputStrategy
+{
+public:
+	virtual void display_answer(const Message& answer) final {
+		std::ofstream fs("test_outpu.txt");
+		if (!fs)
+		{
+			std::cerr << "Cannot open the output file." << std::endl;
+		}
+		else
+		{
+			fs << answer;
+		}
+	}
+};
+
+class OutputInStdout : public OutputStrategy
+{
+public:
+	virtual void display_answer(const Message& answer) final {
+		std::cout << "RESULT: " << answer;
+	}
+};
+
+class OutputInMessageBox : public OutputStrategy
+{
+public:
+	virtual void display_answer(const Message& answer) final {
+		std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
+		std::wstring wstr = converter.from_bytes(answer.data(), answer.data() + answer.size());
+		MessageBoxW(HWND_DESKTOP, wstr.c_str(), L"", MB_OK | MB_ICONQUESTION);
+	}
+};
+
+int main(int argc, char* argv[]) {
 	// Setup utf-8 format
 	SetConsoleOutputCP(CP_UTF8);
 	setvbuf(stdout, nullptr, _IOFBF, 1000);
-
 	WSADATA WSAData;
 	const int wsa_startup_status_code = WSAStartup(MAKEWORD(2, 0), &WSAData);
 	
@@ -34,6 +77,29 @@ int main() {
 
 	const char* IP = "127.0.0.1";
 	const int PORT = 5555;
+
+	OutputStrategy* output_object = NULL;
+
+	auto a = argv[1];
+	std::cout << a << (a == "-message_box") << strcmp(a, "-message_box")  << std::endl;
+
+	if (argc != 1) {
+		if (argv[1] == "-message_box") {
+			output_object = new OutputInMessageBox();
+		}
+		else if (argv[1] == "-file") {
+			output_object = new OutputInFile();
+		}
+		else
+		{
+			output_object = new OutputInStdout();
+		}
+	}
+	else
+	{
+		output_object = new OutputInStdout();
+	}
+
 
 	MySocket my_socket;
 
@@ -56,7 +122,8 @@ int main() {
 	{ 
 		int text_len = 0;
 		std::string user_input;
-		std::cin >> user_input;
+
+		getline(std::cin, user_input);
 		if (user_input == "")
 			continue;
 		try
@@ -74,6 +141,7 @@ int main() {
 		try
 		{
 			text_len = my_socket.receive_message(recvbuf.data(), MESSAGE_SIZE, 0);
+			output_object->display_answer(recvbuf);
 		}
 		catch (const std::exception& ex)
 		{

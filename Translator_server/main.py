@@ -18,10 +18,9 @@ if __name__ == "__main__":
     - Environment vars
     """
     client_socket_handler, socket_manager = FirstConfigHandler.handle()
-
-    logger.info(f"Server mode selected: {client_socket_handler.__name__}")
+    logger.info(f"Server mode selected: {client_socket_handler.__class__.__name__}")
 
     with socket_manager as connections_handler:
         while True:
             client_socket, client_address = connections_handler.wait_connection()
-            client_socket_handler(client_socket, client_address)
+            client_socket_handler.handle_client(client_socket, client_address)

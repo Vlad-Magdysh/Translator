@@ -13,14 +13,41 @@ logger = logging.getLogger(__name__)
 
 
 MESSAGE_SIZE = 1024
-REQUEST_PATTERN = r"\[(\w+)\]\s(\w+)"
+
+LANG_IDENTIFIER_PATTERN = r"(?<=\[)(\w+)(?=\])"
+WORD_IDENTIFIER_PATTERN = r"(?<!\[)(\w+)(?!\])(?:\s|$)"
+
+LANGUAGE_PARAMETER = "language"
+WORD_PARAMETER = "word_to_translate"
+
+class RequestParser:
+    """
+    Try to get specified field from the request string
+    """
+    def __init__(self):
+        self.key_to_regex ={
+            LANGUAGE_PARAMETER: LANG_IDENTIFIER_PATTERN,
+            WORD_PARAMETER: WORD_IDENTIFIER_PATTERN
+        }
+
+    def parse_request(self, data: str) -> dict:
+        result = {}
+        for key, regex_pattern in self.key_to_regex.items():
+            match = re.search(regex_pattern, data)
+            if match is not None:
+                result[key] = match.group()
+
+        return result
 
 
 class DefaultClientHandler:
     """
     The class use direct approach for client processing: one instance = one_client
     """
-    def __init__(self, translator: BaseTranslator, response_formatter: Optional[AbstractFormatter] = None):
+    def __init__(
+            self, translator: BaseTranslator,
+            response_formatter: Optional[AbstractFormatter] = None,
+            request_parser: Optional[RequestParser] = None):
         """
         Args:
             translator (BaseTranslator): translates word from a language to another
@@ -30,6 +57,16 @@ class DefaultClientHandler:
         # So in the future it will be easy to add a new translator, read the configs and create a handler with it.
         self.translator = translator
         self.response_formatter = response_formatter
+        self.request_parser = request_parser if request_parser is not None else RequestParser()
+
+    def _init_regex(self):
+        """
+        Creates a dictionary attr_name to special regex. Regex will be used to identify an attribute in the request str.
+        Method may be overwritten in the inherited classes
+        Args:
+
+        :return:
+        """
 
     def handle_client(self, client_socket: socket, client_address: socket) -> None:
         """
@@ -45,23 +82,24 @@ class DefaultClientHandler:
                 if not data:
                     break
 
-                parsed_request = re.search(REQUEST_PATTERN, data.decode("utf-8"))
-                if parsed_request is not None:
-                    language, word_to_translate = parsed_request.groups()
-                else:
-                    continue
+                parameters = self.request_parser.parse_request(data.decode("utf-8"))
                 logger.info(
-                    f"Client {client_address} request: destination lang = {language} value = {word_to_translate}")
+                    f"Client {client_address} request: "
+                    f"lang = {parameters.get(LANGUAGE_PARAMETER, 'uk')} "
+                    f"value = {parameters.get(WORD_PARAMETER, '')}")
 
                 try:
-                    answer = self.translator.translate(word_to_translate, dest=language)
+                    answer = self.translator.translate(word=parameters.get(WORD_PARAMETER, ""),
+                                                       dest=parameters.get(LANGUAGE_PARAMETER, "uk"))
                 except Exception as ex:
                     logger.error(str(ex))
+                    client_socket.sendall(f"EXCEPTION!{ex}".encode("utf-8"))
                     continue
 
                 if self.response_formatter is not None:
                     answer = self.response_formatter(answer)
-
+                if not len(answer):
+                    answer = 'EXCEPTION!empty_response'
                 client_socket.sendall(answer.encode("utf-8"))
                 logger.info(f"Response {client_address}:  value = {answer}")
 
