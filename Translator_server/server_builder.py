@@ -1,114 +1,103 @@
 import argparse
+import configparser
+import ipaddress
 import os.path
 from abc import ABC, abstractmethod
-from typing import Optional
-import ipaddress
-import configparser
+
 from my_translator import MyTranslator
-from socket_manager import SocketManager
-from handlers import DefaultClientHandler, MultithreadingClientHandler, MultiprocessingClientHandler
+from request_handlers import (DefaultClientHandler,
+                              MultiprocessingClientHandler,
+                              MultithreadingClientHandler)
 from response_formatters import JsonFormatter, XmlFormatter
+from socket_manager import SocketManager
 
 IP = '127.0.0.1'
 PORT = 5555
 
 MULTIPROCESSING = "multiprocessing"
 THREADING = "threading"
-DEFAULT= "default"
+DEFAULT = "default"
 
 JSON_OUTPUT_FORMAT = "JSON"
 XML_OUTPUT_FORMAT = "XML"
 
+MODE_TO_CLIENT_HANDLER = {
+    THREADING: MultithreadingClientHandler,
+    MULTIPROCESSING: MultiprocessingClientHandler,
+    DEFAULT: DefaultClientHandler
+}
+FORMATTER_MAP = {
+    JSON_OUTPUT_FORMAT: JsonFormatter,
+    XML_OUTPUT_FORMAT: XmlFormatter
+}
+
 CONFIG_FILE_PATH = os.path.join(os.path.dirname(__file__), "config.ini")
 
 
-class BaseConfigHandler(ABC):
-    mode_to_handler = {
-        THREADING: MultithreadingClientHandler,
-        MULTIPROCESSING: MultiprocessingClientHandler,
-        DEFAULT: DefaultClientHandler
-    }
-    formatter_map = {
-        JSON_OUTPUT_FORMAT: JsonFormatter,
-        XML_OUTPUT_FORMAT: XmlFormatter
-    }
+class ConfigurationObject:
+    """
+    Accumulates server configuration.
+    Forbids updating an attribute if it has already been initialized.
+    So if the first ConfigHandler has initialized an attribute - the next ConfigHandler must not override
+    """
+    __slots__ = ("server_mode", "response_formatter", "ip", "port", "listen")
 
+    def __setattr__(self, name, value):
+        if getattr(self, name, None) is None:
+            super().__setattr__(name, value)
+
+
+class BaseConfigHandler(ABC):
     @staticmethod
     @abstractmethod
-    def handle(client_handler_object: Optional[DefaultClientHandler] = None,
-               socket_manager_object: Optional[SocketManager] = None):
+    def handle(config_object: ConfigurationObject) -> None:
         raise NotImplementedError()
+
 
 class EnvVariablesHandler(BaseConfigHandler):
     @staticmethod
-    def handle(client_handler_object: Optional[DefaultClientHandler] = None,
-               socket_manager_object: Optional[SocketManager] = None):
-        if client_handler_object is None:
-            client_socket_handler_class = BaseConfigHandler.mode_to_handler[os.getenv("SERVER_MODE", DEFAULT)]
-            client_handler_object = client_socket_handler_class(
-                translator=MyTranslator(),
-                response_formatter=BaseConfigHandler.formatter_map.get(os.getenv("SERVER_RESPONSE_FORMAT", None))
-            )
-
-        if socket_manager_object is None:
-            socket_manager_object = SocketManager(
-                ip=os.getenv("SERVER_IP", "127.0.0.1"),
-                port=os.getenv("SERVER_PORT", 5555),
-                listen=os.getenv("SERVER_LISTEN", 4)
-            )
-        return client_handler_object, socket_manager_object
+    def handle(config_object: ConfigurationObject) -> None:
+        config_object.server_mode = os.getenv("SERVER_MODE", DEFAULT)
+        config_object.response_formatter = os.getenv("SERVER_RESPONSE_FORMAT", None)
+        config_object.ip = os.getenv("SERVER_IP", "127.0.0.1")
+        config_object.port = os.getenv("SERVER_PORT", 5555)
+        config_object.listen = os.getenv("SERVER_LISTEN", 4)
 
 
 class ConfigFileHandler(BaseConfigHandler):
     @staticmethod
-    def handle(client_handler_object: Optional[DefaultClientHandler] = None,
-               socket_manager_object: Optional[SocketManager] = None):
-
+    def handle(config_object: ConfigurationObject) -> None:
         if os.path.isfile(CONFIG_FILE_PATH):
             config = configparser.ConfigParser()
             config.read(CONFIG_FILE_PATH)
+
             if config.has_section("HANDLER"):
-                handler_options = dict(config.items('HANDLER'))
-                if client_handler_object is None:
-                    client_socket_handler_class = BaseConfigHandler.mode_to_handler[handler_options["mode"]]
-                    client_handler_object = client_socket_handler_class(
-                        translator=MyTranslator(),
-                    )
-                elif client_handler_object.response_formatter is None:
-                    client_handler_object.response_formatter = BaseConfigHandler.formatter_map.get(config["HANDLER"]["format"])
+                config_object.server_mode = config["HANDLER"]["mode"]
+                config_object.response_formatter = config["HANDLER"]["format"]
 
-            if socket_manager_object is None and config.has_section("SOCKET_MANAGER"):
-                socket_manager_options = dict(config.items('SOCKET_MANAGER'))
-                socket_manager_object = SocketManager(
-                    ip=socket_manager_options["ip"],
-                    port=int(socket_manager_options["port"]),
-                    listen=int(socket_manager_options["listen"])
-                )
+            if config.has_section("SOCKET_MANAGER"):
+                config_object.ip = config["SOCKET_MANAGER"]["ip"]
+                config_object.port = int(config["SOCKET_MANAGER"]["port"])
+                config_object.listen = int(config["SOCKET_MANAGER"]["listen"])
 
-        return EnvVariablesHandler.handle(client_handler_object, socket_manager_object)
+        return EnvVariablesHandler.handle(config_object)
 
 
 class CommandLineArgumentsHandler(BaseConfigHandler):
     @staticmethod
-    def handle(client_handler_object: Optional[DefaultClientHandler] = None,
-               socket_manager_object: Optional[SocketManager] = None):
-        arguments = get_args()
+    def handle(config_object: ConfigurationObject) -> None:
+        arguments = _get_args()
 
-        if client_handler_object is None and arguments.mode is not None:
-            client_socket_handler_class = BaseConfigHandler.mode_to_handler[arguments.mode]
-            client_handler_object = client_socket_handler_class(
-                translator=MyTranslator()
-            )
-        elif client_handler_object is not None and client_handler_object.response_formatter is None and\
-                arguments.format is not None:
-            client_handler_object.response_formatter = BaseConfigHandler.formatter_map.get(arguments.format)
+        config_object.server_mode = arguments.mode
+        config_object.response_formatter = arguments.format
+        config_object.ip = arguments.ip
+        config_object.port = arguments.port
+        config_object.listen = arguments.listen
 
-        if socket_manager_object is None and arguments.ip is not None and arguments.port is not None:
-            socket_manager_object = SocketManager(ip=arguments.ip, port=arguments.port, listen=arguments.listen)
+        return ConfigFileHandler.handle(config_object)
 
-        return ConfigFileHandler.handle(client_handler_object, socket_manager_object)
 
-def get_args():
+def _get_args():
     parser = argparse.ArgumentParser(description="Translator server")
 
     parser.add_argument("-l", "--listen", type=int,
@@ -147,3 +136,20 @@ def get_args():
 
     parsed = parser.parse_args()
     return parsed
+
+
+def build_server():
+    """"""
+    configs = ConfigurationObject()
+    CommandLineArgumentsHandler.handle(config_object=configs)
+    client_handler_class = MODE_TO_CLIENT_HANDLER.get(configs.server_mode)
+    client_handler_object = client_handler_class(
+        translator=MyTranslator(),
+        response_formatter=FORMATTER_MAP.get(configs.response_formatter)
+    )
+    server_socket_manager_object = SocketManager(
+        ip=configs.ip,
+        port=configs.port,
+        listen=configs.listen
+    )
+    return client_handler_object, server_socket_manager_object

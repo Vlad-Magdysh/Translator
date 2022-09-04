@@ -11,9 +11,9 @@ class ConnectionsHandler:
 
     def wait_connection(self) -> socket:
         client_sock, client_address = self._server_socket.accept()
-        client_ip_port = f"{client_address[0]}:{client_address[1]}"
-        logger.info('Connected: {}'.format(client_ip_port))
+        logger.info(f"Connected: {client_address[0]}:{client_address[1]}")
         return client_sock, client_address
+
 
 class SocketManager:
     def __init__(self, ip, port, listen=4):

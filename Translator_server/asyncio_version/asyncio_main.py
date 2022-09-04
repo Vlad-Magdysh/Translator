@@ -1,9 +1,10 @@
-import asyncio, socket
+import asyncio
 import logging
+import socket
 import sys
 from contextlib import closing
-from gpytranslate import Translator
 
+from gpytranslate import Translator
 
 logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 logger = logging.getLogger(__name__)

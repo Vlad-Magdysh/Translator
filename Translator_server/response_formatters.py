@@ -1,11 +1,14 @@
 import json
-from abc import abstractmethod, ABC
+from abc import ABC, abstractmethod
+
 from dicttoxml import dicttoxml
+
+WORD = "word"
 
 
 class AbstractFormatter(ABC):
     @abstractmethod
-    def __call__(self, original_data: str) -> str:
+    def format_data(self, original_data: str) -> str:
         """
         Make class callable and formats an answer for the user
 
@@ -17,14 +20,15 @@ class AbstractFormatter(ABC):
         """
         pass
 
+
 class JsonFormatter(AbstractFormatter):
-    def __call__(self, original_data: str) -> str:
-        return json.dumps({"word": original_data}, indent=4)
+    @classmethod
+    def format_data(cls, original_data: str) -> str:
+        return json.dumps({WORD: original_data}, indent=4)
+
 
 class XmlFormatter(AbstractFormatter):
-    def __call__(self, original_data: str) -> str:
-        data_to_format = [{"word": original_data}]
-        return dicttoxml(data_to_format, custom_root='response', attr_type=False)
-
-
-
+    @classmethod
+    def format_data(cls, original_data: str) -> str:
+        data_to_format = [{WORD: original_data}]
+        return dicttoxml(data_to_format, attr_type=False)

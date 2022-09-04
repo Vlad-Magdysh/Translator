@@ -1,16 +1,14 @@
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
-#include <iostream> 
-#include <cstdio> 
-#include <winsock2.h> 
-
+#pragma comment(lib, "WS2_32.lib")
+#include <memory>
 #include <fstream>
 #include <codecvt>
 #include <locale>
 #include <string>
-#pragma comment(lib, "WS2_32.lib")
 
 #include "MySocket.h"
+#include "WsaDataWrapper.h"
 
 using Message = std::vector<char>; // type alias for std::vector<char>
 
@@ -27,19 +25,18 @@ class OutputStrategy
 {
 public:
 	virtual void display_answer(const Message& answer, const size_t answer_size) = 0;
+	virtual ~OutputStrategy() {};
 };
 
 class OutputInFile : public OutputStrategy
 {
 private:
-	std::string file_destination;
+	std::string m_file_destination;
 
 public:
-	OutputInFile(const std::string& dest) {
-		file_destination = dest;
-	}
-	virtual void display_answer(const Message& answer, const size_t answer_size) final {
-		std::ofstream fs(file_destination, std::ios::app);
+	OutputInFile(const std::string& dest) : m_file_destination(dest) {}
+	virtual void display_answer(const Message& answer, const size_t answer_size) override final {
+		std::ofstream fs(m_file_destination, std::ios::app);
 		if (!fs)
 		{
 			std::cerr << "Cannot open the output file." << std::endl;
@@ -54,17 +51,22 @@ public:
 class OutputInStdout : public OutputStrategy
 {
 public:
-	virtual void display_answer(const Message& answer, const size_t answer_size) final {
-		std::cout << "RESULT: " << answer;
+	virtual void display_answer(const Message& answer, const size_t answer_size) override final {
+		std::cout << "RESULT: " << answer << "\n";
 	}
 };
 
 class OutputInMessageBox : public OutputStrategy
 {
-public:
-	virtual void display_answer(const Message& answer, const size_t answer_size ) final {
+private:
+	std::wstring convert_utf8_to_utf_16(const char * message_start, size_t message_size) {
 		std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
-		std::wstring wstr = converter.from_bytes(answer.data(), answer.data() + answer_size);
+		return converter.from_bytes(message_start, message_start+message_size);
+	}
+
+public:
+	virtual void display_answer(const Message& answer, const size_t answer_size ) override final {
+		const std::wstring wstr = convert_utf8_to_utf_16(answer.data(), answer_size);
 		MessageBoxW(HWND_DESKTOP, wstr.c_str(), L"", MB_OK | MB_ICONQUESTION);
 	}
 };
@@ -72,24 +74,23 @@ public:
 int main(int argc, char* argv[]) {
 	// Setup utf-8 format
 	SetConsoleOutputCP(CP_UTF8);
-	setvbuf(stdout, nullptr, _IOFBF, 1000);
-	WSADATA WSAData;
-	const int wsa_startup_status_code = WSAStartup(MAKEWORD(2, 0), &WSAData);
-	
-	if (wsa_startup_status_code != 0) {
-		std::cerr << "WSAStartup finished with not zero status code: " << wsa_startup_status_code << std::endl;
-	}
+
+	/*
+		In server response, each symbol may be encoded in two bytes instead of one. 
+		So, with this line count will accumulate symbols, correctly interpret and display them.
+	*/
+	setvbuf(stdout, nullptr, _IOFBF, 1000); // 
+	WsaDataWrapper was_data;
 
 	const char* IP = "127.0.0.1";
 	const int PORT = 5555;
 
-	OutputStrategy* output_object = NULL;
-
+	std::unique_ptr<OutputStrategy> output_object;
 
 	if (argc > 1) {
 		std::string user_choise = argv[1];
 		if (user_choise == "-message_box") {
-			output_object = new OutputInMessageBox();
+			output_object = std::make_unique<OutputInMessageBox>();
 		}
 		else if (user_choise == "-file") {
 			std::string file_path;
@@ -102,19 +103,18 @@ int main(int argc, char* argv[]) {
 				file_path.erase(file_path.find_last_of('\\') + 1);
 				file_path += "default_file.txt";
 			}
-			output_object = new OutputInFile(file_path);
+			output_object = std::make_unique<OutputInFile>(file_path);
 		}
 		else
 		{
-			output_object = new OutputInStdout();
+			output_object = std::make_unique<OutputInStdout>();
 		}
 	}
 	else
 	{
-		output_object = new OutputInStdout();
+		output_object = std::make_unique<OutputInStdout>();
 	}
 
-	std::cout << "Client is running with configured" << typeid(output_object).name() << std::endl;
 
 	MySocket my_socket;
 
@@ -174,5 +174,4 @@ int main(int argc, char* argv[]) {
 		}
 		output_object->display_answer(recvbuf, text_len);
 	}
-	WSACleanup();
 }
