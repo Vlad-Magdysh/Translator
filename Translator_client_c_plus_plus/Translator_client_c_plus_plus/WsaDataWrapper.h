@@ -1,6 +1,4 @@
 #pragma once
-#include <iostream> 
-#include <cstdio> 
 #include <winsock2.h> 
 
 class WsaDataWrapper

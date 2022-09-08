@@ -1,6 +1,9 @@
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
 #pragma comment(lib, "WS2_32.lib")
+
+#include <iostream> 
+#include <cstdio> 
 #include <memory>
 #include <fstream>
 #include <codecvt>
@@ -9,78 +12,22 @@
 
 #include "MySocket.h"
 #include "WsaDataWrapper.h"
-
-using Message = std::vector<char>; // type alias for std::vector<char>
-
-std::ostream& operator<< (std::ostream& out, const Message& v) {
-	auto iter = v.begin();
-	while (iter != v.end() && *iter !=0)
-	{
-		out << *iter++;
-	}
-	return out;
-}
-
-class OutputStrategy
-{
-public:
-	virtual void display_answer(const Message& answer, const size_t answer_size) = 0;
-	virtual ~OutputStrategy() {};
-};
-
-class OutputInFile : public OutputStrategy
-{
-private:
-	std::string m_file_destination;
-
-public:
-	OutputInFile(const std::string& dest) : m_file_destination(dest) {}
-	virtual void display_answer(const Message& answer, const size_t answer_size) override final {
-		std::ofstream fs(m_file_destination, std::ios::app);
-		if (!fs)
-		{
-			std::cerr << "Cannot open the output file." << std::endl;
-		}
-		else
-		{
-			fs << answer << "\n";
-		}
-	}
-};
-
-class OutputInStdout : public OutputStrategy
-{
-public:
-	virtual void display_answer(const Message& answer, const size_t answer_size) override final {
-		std::cout << "RESULT: " << answer << "\n";
-	}
-};
-
-class OutputInMessageBox : public OutputStrategy
-{
-private:
-	std::wstring convert_utf8_to_utf_16(const char * message_start, size_t message_size) {
-		std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
-		return converter.from_bytes(message_start, message_start+message_size);
-	}
-
-public:
-	virtual void display_answer(const Message& answer, const size_t answer_size ) override final {
-		const std::wstring wstr = convert_utf8_to_utf_16(answer.data(), answer_size);
-		MessageBoxW(HWND_DESKTOP, wstr.c_str(), L"", MB_OK | MB_ICONQUESTION);
-	}
-};
+#include "OutputStrategies.h"
 
 int main(int argc, char* argv[]) {
 	// Setup utf-8 format
 	SetConsoleOutputCP(CP_UTF8);
 
-	/*
-		In server response, each symbol may be encoded in two bytes instead of one. 
-		So, with this line count will accumulate symbols, correctly interpret and display them.
-	*/
-	setvbuf(stdout, nullptr, _IOFBF, 1000); // 
-	WsaDataWrapper was_data;
+	std::unique_ptr<WsaDataWrapper> wsa_data;
+	try
+	{
+		wsa_data = std::make_unique<WsaDataWrapper>();
+	}
+	catch (const std::exception& ex)
+	{
+		std::cerr << ex.what() << std::endl;
+		return -1;
+	}
 
 	const char* IP = "127.0.0.1";
 	const int PORT = 5555;

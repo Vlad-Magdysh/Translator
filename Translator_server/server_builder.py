@@ -48,25 +48,31 @@ class ConfigurationObject:
 
 
 class BaseConfigHandler(ABC):
-    @staticmethod
+
+    def __init__(self, _next_handler=None):
+        self._next_handler = _next_handler
+
     @abstractmethod
-    def handle(config_object: ConfigurationObject) -> None:
+    def handle(self, config_object: ConfigurationObject) -> None:
         raise NotImplementedError()
+
+    def set_next(self, handler):
+        self._next_handler = handler
 
 
 class EnvVariablesHandler(BaseConfigHandler):
-    @staticmethod
-    def handle(config_object: ConfigurationObject) -> None:
+    def handle(self, config_object: ConfigurationObject) -> None:
         config_object.server_mode = os.getenv("SERVER_MODE", DEFAULT)
         config_object.response_formatter = os.getenv("SERVER_RESPONSE_FORMAT", None)
         config_object.ip = os.getenv("SERVER_IP", "127.0.0.1")
         config_object.port = os.getenv("SERVER_PORT", 5555)
         config_object.listen = os.getenv("SERVER_LISTEN", 4)
+        if self._next_handler is not None:
+            self._next_handler.handle(config_object)
 
 
 class ConfigFileHandler(BaseConfigHandler):
-    @staticmethod
-    def handle(config_object: ConfigurationObject) -> None:
+    def handle(self, config_object: ConfigurationObject) -> None:
         if os.path.isfile(CONFIG_FILE_PATH):
             config = configparser.ConfigParser()
             config.read(CONFIG_FILE_PATH)
@@ -79,13 +85,12 @@ class ConfigFileHandler(BaseConfigHandler):
                 config_object.ip = config["SOCKET_MANAGER"]["ip"]
                 config_object.port = int(config["SOCKET_MANAGER"]["port"])
                 config_object.listen = int(config["SOCKET_MANAGER"]["listen"])
-
-        return EnvVariablesHandler.handle(config_object)
+        if self._next_handler is not None:
+            self._next_handler.handle(config_object)
 
 
 class CommandLineArgumentsHandler(BaseConfigHandler):
-    @staticmethod
-    def handle(config_object: ConfigurationObject) -> None:
+    def handle(self, config_object: ConfigurationObject) -> None:
         arguments = _get_args()
 
         config_object.server_mode = arguments.mode
@@ -93,8 +98,8 @@ class CommandLineArgumentsHandler(BaseConfigHandler):
         config_object.ip = arguments.ip
         config_object.port = arguments.port
         config_object.listen = arguments.listen
-
-        return ConfigFileHandler.handle(config_object)
+        if self._next_handler is not None:
+            self._next_handler.handle(config_object)
 
 
 def _get_args():
@@ -141,7 +146,8 @@ def _get_args():
 def build_server():
     """"""
     configs = ConfigurationObject()
-    CommandLineArgumentsHandler.handle(config_object=configs)
+    first_handler = CommandLineArgumentsHandler(ConfigFileHandler(EnvVariablesHandler()))
+    first_handler.handle(config_object=configs)
     client_handler_class = MODE_TO_CLIENT_HANDLER.get(configs.server_mode)
     client_handler_object = client_handler_class(
         translator=MyTranslator(),

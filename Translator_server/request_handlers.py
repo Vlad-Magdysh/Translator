@@ -25,13 +25,13 @@ class DefaultClientHandler:
             request_parser: Optional[RequestParser] = None):
         """
         Args:
-            _translator (Base_translator): translates word from a language to another
-            _response_formatter (BaseFormatter): converts an answer from _translator in a custom format
+            translator (Base_translator): translates word from a language to another
+            response_formatter (BaseFormatter): converts an answer from _translator in a custom format
         """
         # Now the project has only one _translator, but I left the opportunity to pass it as parameter to handlers
         # So in the future it will be easy to add a new _translator, read the configs and create a handler with it.
         self._translator = translator
-        self.response_formatter = response_formatter
+        self._response_formatter = response_formatter
         self._request_parser = request_parser if request_parser is not None else RequestParser()
 
     def _read_data(self, client_socket: socket):
@@ -47,14 +47,13 @@ class DefaultClientHandler:
         word = parameters.get(WORD_PARAMETER, '')
         logger.info(f"Client {client_address} request: lang = {lang} value = {word}")
         try:
-            answer = self._translator.translate(word=parameters.get(WORD_PARAMETER, ""),
-                                               dest=lang)
+            answer = self._translator.translate(word=word, dest=lang)
         except Exception as ex:
             logger.error(str(ex))
-            answer = f"EXCEPTION!{ex}".encode("utf-8")
+            answer = f"EXCEPTION!{ex}"
         else:
-            if self.response_formatter is not None:
-                answer = self.response_formatter.format_data(answer)
+            if self._response_formatter is not None:
+                answer = self._response_formatter.format_data(answer)
         if not len(answer):
             answer = 'EXCEPTION!empty_response'
         return answer
@@ -85,14 +84,6 @@ class DefaultClientHandler:
 
                 logging.info(f"Sending response to {client_address}")
                 self._send_data(answer, client_socket, client_address)
-
-    @property
-    def response_formatter(self) -> Optional[AbstractFormatter]:
-        return self._response_formatter
-
-    @response_formatter.setter
-    def response_formatter(self, response_formatter: Optional[AbstractFormatter]) -> None:
-        self._response_formatter = response_formatter
 
 
 class MultithreadingClientHandler(DefaultClientHandler):
