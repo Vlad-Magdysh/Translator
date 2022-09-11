@@ -29,7 +29,7 @@ void OutputInStdout::display_answer(const Message& answer, const size_t answer_s
 	std::cout << "RESULT: " << answer << "\n";
 }
 
-std::wstring OutputInMessageBox::convert_utf8_to_utf_16(const char* message_start, size_t message_size) const {
+std::wstring convert_utf8_to_utf_16(const char* message_start, size_t message_size) {
 	std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
 	return converter.from_bytes(message_start, message_start + message_size);
 }

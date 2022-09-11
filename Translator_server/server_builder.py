@@ -54,10 +54,8 @@ class BaseConfigHandler(ABC):
 
     @abstractmethod
     def handle(self, config_object: ConfigurationObject) -> None:
-        raise NotImplementedError()
-
-    def set_next(self, handler):
-        self._next_handler = handler
+        if self._next_handler is not None:
+            self._next_handler.handle(config_object)
 
 
 class EnvVariablesHandler(BaseConfigHandler):
@@ -67,8 +65,7 @@ class EnvVariablesHandler(BaseConfigHandler):
         config_object.ip = os.getenv("SERVER_IP", "127.0.0.1")
         config_object.port = os.getenv("SERVER_PORT", 5555)
         config_object.listen = os.getenv("SERVER_LISTEN", 4)
-        if self._next_handler is not None:
-            self._next_handler.handle(config_object)
+        super().handle(config_object)
 
 
 class ConfigFileHandler(BaseConfigHandler):
@@ -85,8 +82,7 @@ class ConfigFileHandler(BaseConfigHandler):
                 config_object.ip = config["SOCKET_MANAGER"]["ip"]
                 config_object.port = int(config["SOCKET_MANAGER"]["port"])
                 config_object.listen = int(config["SOCKET_MANAGER"]["listen"])
-        if self._next_handler is not None:
-            self._next_handler.handle(config_object)
+        super().handle(config_object)
 
 
 class CommandLineArgumentsHandler(BaseConfigHandler):
@@ -98,8 +94,7 @@ class CommandLineArgumentsHandler(BaseConfigHandler):
         config_object.ip = arguments.ip
         config_object.port = arguments.port
         config_object.listen = arguments.listen
-        if self._next_handler is not None:
-            self._next_handler.handle(config_object)
+        super().handle(config_object)
 
 
 def _get_args():

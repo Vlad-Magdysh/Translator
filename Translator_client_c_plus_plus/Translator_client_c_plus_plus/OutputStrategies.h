@@ -7,6 +7,8 @@ using Message = std::vector<char>; // type alias for std::vector<char>
 
 std::ostream& operator<< (std::ostream& out, const Message& v);
 
+std::wstring convert_utf8_to_utf_16(const char* message_start, size_t message_size);
+
 class OutputStrategy
 {
 public:
@@ -32,8 +34,6 @@ public:
 
 class OutputInMessageBox : public OutputStrategy
 {
-private:
-	std::wstring convert_utf8_to_utf_16(const char* message_start, size_t message_size) const;
 public:
 	virtual void display_answer(const Message& answer, const size_t answer_size) const override final;
 };
