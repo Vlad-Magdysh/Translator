@@ -52,7 +52,7 @@ class MyTranslator(BaseTranslator):
     Wrapper on the googletrans.Translator
     """
     def __init__(self):
-        self._translator = Translator(service_urls=['translate.googleapis.com', 'translate.google.com'])
+        self._translator = Translator(service_urls=['translate.google.com'])
         self._translator.raise_Exception = True
 
     @retry(number=10, timeout=0.5)

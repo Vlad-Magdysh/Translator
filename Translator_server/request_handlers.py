@@ -94,8 +94,23 @@ class MultithreadingClientHandler(DefaultClientHandler):
 
 
 class MultiprocessingClientHandler(DefaultClientHandler):
+
+    @staticmethod
+    def run_parallel(client_socket: socket, client_address: socket, translator_class,
+                     response_formatter_object=None, request_parser_object=None):
+        client_handler = DefaultClientHandler(
+            translator=translator_class(),
+            response_formatter=response_formatter_object,
+            request_parser=request_parser_object
+        )
+        client_handler.handle_client(client_socket, client_address)
+
     def handle_client(self, client_socket: socket, client_address: socket) -> None:
-        process = multiprocessing.Process(target=super().handle_client, args=(client_socket, client_address))
+        print()
+        process = multiprocessing.Process(
+            target=MultiprocessingClientHandler.run_parallel,
+            args=(client_socket, client_address, self._translator.__class__, self._response_formatter, self._request_parser)
+        )
         # When a main process exits, it attempts to terminate all of its daemonic child processes.
         process.daemon = True
         process.start()
