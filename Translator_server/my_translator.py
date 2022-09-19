@@ -52,8 +52,18 @@ class MyTranslator(BaseTranslator):
     Wrapper on the googletrans.Translator
     """
     def __init__(self):
+        self._init_translator()
+
+    def _init_translator(self):
         self._translator = Translator(service_urls=['translate.google.com'])
         self._translator.raise_Exception = True
+
+    def __getstate__(self):
+        return {key: value for key, value in self.__dict__.items() if key != '_translator'}
+
+    def __setstate__(self, state):
+        self.__dict__ = state
+        self._init_translator()
 
     @retry(number=10, timeout=0.5)
     def translate(self, word, dest='uk', src='auto') -> str:
