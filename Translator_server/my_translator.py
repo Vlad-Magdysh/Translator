@@ -49,12 +49,12 @@ class BaseTranslator(ABC):
         pass
 
 
-class MyTranslator(BaseTranslator, SerializeMixin):
+class MyTranslator(SerializeMixin, BaseTranslator):
     """
     Wrapper on the googletrans.Translator
     """
     def __init__(self):
-        SerializeMixin.__init__(self, ignore_fields="_translator", set_hooks=[self._init_translator])
+        super().__init__(ignore_fields="_translator", set_hooks=[self._init_translator])
         self._init_translator()
 
     def _init_translator(self):
