@@ -1,56 +1,30 @@
 """Main file of the server"""
-import argparse
+
 import logging
 import sys
 
-from socket_manager import SocketManager
-from handlers import threading_handler, multiprocessing_handler, default_single_client_handler
+from server_builder import build_server
 
 logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-IP = '127.0.0.1'
-PORT = 5555
 
-MULTIPROCESSING = "multiprocessing"
-THREADING = "threading"
+def main():
+    """
+    Reading Configuration order
+    - Command line
+    - Local config file
+    - Environment vars
+    """
+    client_socket_handler, socket_manager = build_server()
+    logger.info(f"Server mode selected: {client_socket_handler.__class__.__name__}")
 
-
-def get_args():
-    parser = argparse.ArgumentParser(description="Translator server")
-
-    parser.add_argument("-l", "--listen", type=int,
-                        choices=list(range(1, 10)), default=4, help="Max number of connections")
-
-    modes = parser.add_mutually_exclusive_group()
-    modes.add_argument("-t", "--threading",
-                       action='store_const',
-                       const=THREADING,
-                       dest='mode',
-                       help="Start server in Threading mode")
-    modes.add_argument("-p", "--multiprocessing",
-                       action='store_const',
-                       const=MULTIPROCESSING,
-                       dest='mode',
-                       help="Start server in Threading mode")
-
-    parsed = parser.parse_args()
-    return parsed
+    with socket_manager as connections_handler:
+        while True:
+            client_socket, client_address = connections_handler.wait_connection()
+            client_socket_handler.handle_client(client_socket, client_address)
 
 
 if __name__ == "__main__":
-    mode_to_handler = {
-        THREADING: threading_handler,
-        MULTIPROCESSING: multiprocessing_handler,
-        None: default_single_client_handler
-    }
-    arguments = get_args()
-    client_socket_handler = mode_to_handler.get(arguments.mode, default_single_client_handler)
-
-    logger.info(f"Server mode selected: {client_socket_handler.__name__}")
-
-    with SocketManager(ip=IP, port=PORT, listen=arguments.listen) as connections_handler:
-        while True:
-            client_socket, client_address = connections_handler.wait_connection()
-            client_socket_handler(client_socket, client_address)
+    main()

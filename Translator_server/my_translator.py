@@ -3,8 +3,11 @@
 import functools
 import logging
 import time
+from abc import ABC, abstractmethod
 
 from googletrans import Translator
+
+from mixins import SerializeMixin
 
 logger = logging.getLogger(__name__)
 
@@ -40,16 +43,26 @@ def retry(number=5, timeout=0.1):
     return internal
 
 
-class MyTranslator:
+class BaseTranslator(ABC):
+    @abstractmethod
+    def translate(self, word, dest='uk', src='auto') -> str:
+        pass
+
+
+class MyTranslator(SerializeMixin, BaseTranslator):
     """
     Wrapper on the googletrans.Translator
     """
     def __init__(self):
-        self._translator = Translator(service_urls=['translate.googleapis.com', 'translate.google.com'])
+        super().__init__(ignore_fields="_translator", set_hooks=[self._init_translator])
+        self._init_translator()
+
+    def _init_translator(self):
+        self._translator = Translator(service_urls=['translate.google.com'])
         self._translator.raise_Exception = True
 
     @retry(number=10, timeout=0.5)
-    def translate(self, word, dest='uk', src='auto'):
+    def translate(self, word, dest='uk', src='auto') -> str:
         """
         Translate a word from a language to another
         :param word: Word to translate

@@ -1,39 +1,67 @@
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
-#include <iostream> 
-#include <cstdio> 
-#include <winsock2.h> 
-#include <vector>
-
+#define _CRT_SECURE_NO_WARNINGS
 #pragma comment(lib, "WS2_32.lib")
 
+#include <iostream> 
+#include <cstdio> 
+#include <memory>
+#include <fstream>
+#include <codecvt>
+#include <locale>
+#include <string>
+
 #include "MySocket.h"
+#include "WsaDataWrapper.h"
+#include "OutputStrategies.h"
 
-using Message = std::vector<char>; // type alias for std::vector<char>
-
-std::ostream& operator<< (std::ostream& out, const Message& v) {
-	auto iter = v.begin();
-	while (iter != v.end() && *iter !=0)
-	{
-		std::cout << *iter++;
-	}
-	std::cout << std::endl;
-	return out;
-}
-
-int main() {
+int main(int argc, char* argv[]) {
 	// Setup utf-8 format
 	SetConsoleOutputCP(CP_UTF8);
-	setvbuf(stdout, nullptr, _IOFBF, 1000);
 
-	WSADATA WSAData;
-	const int wsa_startup_status_code = WSAStartup(MAKEWORD(2, 0), &WSAData);
-	
-	if (wsa_startup_status_code != 0) {
-		std::cerr << "WSAStartup finished with not zero status code: " << wsa_startup_status_code << std::endl;
+	std::unique_ptr<WsaDataWrapper> wsa_data;
+	try
+	{
+		wsa_data = std::make_unique<WsaDataWrapper>();
+	}
+	catch (const std::exception& ex)
+	{
+		std::cerr << ex.what() << std::endl;
+		return -1;
 	}
 
 	const char* IP = "127.0.0.1";
 	const int PORT = 5555;
+
+	std::unique_ptr<OutputStrategy> output_object;
+
+	if (argc > 1) {
+		std::string user_choise = argv[1];
+		if (user_choise == "-message_box") {
+			output_object = std::make_unique<OutputInMessageBox>();
+		}
+		else if (user_choise == "-file") {
+			std::string file_path;
+			if (argc > 2)
+			{
+				file_path = argv[2];
+			}
+			else {
+				file_path = argv[0];
+				file_path.erase(file_path.find_last_of('\\') + 1);
+				file_path += "default_file.txt";
+			}
+			output_object = std::make_unique<OutputInFile>(file_path);
+		}
+		else
+		{
+			output_object = std::make_unique<OutputInStdout>();
+		}
+	}
+	else
+	{
+		output_object = std::make_unique<OutputInStdout>();
+	}
+
 
 	MySocket my_socket;
 
@@ -56,7 +84,8 @@ int main() {
 	{ 
 		int text_len = 0;
 		std::string user_input;
-		std::cin >> user_input;
+
+		getline(std::cin, user_input);
 		if (user_input == "")
 			continue;
 		try
@@ -90,8 +119,6 @@ int main() {
 		else {
 			std::cerr << "Failed to receive\n";
 		}
-
-		std::cout << "RESULT: " << recvbuf;
+		output_object->display_answer(recvbuf, text_len);
 	}
-	WSACleanup();
 }
