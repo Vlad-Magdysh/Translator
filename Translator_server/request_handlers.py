@@ -62,7 +62,7 @@ class DefaultClientHandler:
         client_socket.sendall(data.encode("utf-8"))
         logger.info(f"Response {client_address}:  value = {data}")
 
-    def handle_client(self, client_socket: socket, client_address: socket) -> None:
+    def handle_client(self, client_socket: socket, client_address) -> None:
         """
         Skeleton of the client processing algorithm
         """
@@ -99,7 +99,6 @@ class MultiprocessingClientHandler(DefaultClientHandler):
         super().handle_client(client_socket, client_address)
 
     def handle_client(self, client_socket: socket, client_address: socket) -> None:
-        print()
         process = multiprocessing.Process(
             target=self.run_parallel, args=(client_socket, client_address)
         )
